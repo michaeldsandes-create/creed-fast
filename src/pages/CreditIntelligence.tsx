@@ -388,12 +388,13 @@ export default function CreditIntelligence() {
                     </h3>
                     <button
                       onClick={async () => {
+                        if (!selectedClient) return;
                         setAiLoading(true);
                         const result = await analyzeClientCredit(
                           { 
                             name: selectedClient.client.name, 
-                            requestedAmount: selectedClient.client.requestedAmount || 0,
-                            observation: selectedClient.client.observation || 'Sem observações'
+                            requestedAmount: (selectedClient.client as any).requestedAmount || 0,
+                            observation: (selectedClient.client as any).observation || 'Sem observações'
                           },
                           {
                             score: selectedClient.score,

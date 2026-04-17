@@ -51,11 +51,11 @@ export function mapSupabasePayment(data: any): Payment {
 
 export function mapSupabaseSettings(data: any): AppSettings {
   return {
-    tema: data.tema,
-    cor_primaria: data.cor_primaria,
+    tema: data.dark_mode ? 'escuro' : 'claro',
+    cor_primaria: data.primary_color || '#10b981',
     notificacao_email: data.notificacao_email,
-    biometria: data.biometria,
-    availableCapital: data.available_capital,
+    biometria: data.biometria || false,
+    availableCapital: data.disponivel_capital || 0,
   };
 }
 
@@ -93,6 +93,8 @@ export function mapPaymentToSupabase(payment: Partial<Payment>): any {
 
 export function mapSettingsToSupabase(settings: Partial<AppSettings>): any {
   const data: any = { ...settings };
-  if (data.availableCapital !== undefined) { data.available_capital = data.availableCapital; delete data.availableCapital; }
+  if (data.availableCapital !== undefined) { data.disponivel_capital = data.availableCapital; delete data.availableCapital; }
+  if (data.cor_primaria !== undefined) { data.primary_color = data.cor_primaria; delete data.cor_primaria; }
+  if (data.tema !== undefined) { data.dark_mode = data.tema === 'escuro'; delete data.tema; }
   return data;
 }
