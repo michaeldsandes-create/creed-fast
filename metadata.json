@@ -1,0 +1,7 @@
+{
+  "name": "CREED-FAST",
+  "description": "Sistema de gestão de empréstimos com dashboard, cadastro de clientes e controle de pagamentos.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

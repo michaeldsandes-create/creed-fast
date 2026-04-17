@@ -1,0 +1,111 @@
+{
+  "entities": {
+    "User": {
+      "title": "Usuário Administrador",
+      "description": "Perfil de administrador do sistema com acesso total.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "ID único do Firebase Auth" },
+        "email": { "type": "string", "description": "Email do administrador" },
+        "role": { "type": "string", "enum": ["admin"], "description": "Papel de acesso no sistema" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Client": {
+      "title": "Cliente",
+      "description": "Informações cadastrais do cliente e status da solicitação.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID do documento do cliente" },
+        "name": { "type": "string", "description": "Nome completo do cliente" },
+        "cpf": { "type": "string", "description": "CPF (apenas números)" },
+        "email": { "type": "string", "description": "Email de contato" },
+        "selfieUrl": { "type": "string", "description": "URL da foto de identificação" },
+        "address": { "type": "string", "description": "Endereço completo" },
+        "requestedAmount": { "type": "number", "description": "Valor solicitado inicialmente" },
+        "observation": { "type": "string", "description": "Observações internas" },
+        "status": { 
+          "type": "string", 
+          "enum": ["Em análise", "Aprovado", "Rejeitado", "Aguardando caixa"],
+          "description": "Status atual do cadastro do cliente"
+        },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Data de criação do cadastro" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Data da última atualização" }
+      },
+      "required": ["name", "cpf", "email", "status"]
+    },
+    "Loan": {
+      "title": "Empréstimo",
+      "description": "Detalhes do contrato de empréstimo ativo ou finalizado.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID do contrato" },
+        "clientId": { "type": "string", "description": "ID do cliente associado" },
+        "type": { 
+          "type": "string", 
+          "enum": ["simple", "installment"],
+          "description": "Tipo de empréstimo: simples (juros no final) ou parcelado"
+        },
+        "principal": { "type": "number", "description": "Valor do capital emprestado" },
+        "interestRate": { "type": "number", "description": "Taxa de juros aplicada" },
+        "totalAmount": { "type": "number", "description": "Valor total a ser pago (capital + juros)" },
+        "remainingAmount": { "type": "number", "description": "Saldo devedor atual" },
+        "installments": { "type": "number", "description": "Número total de parcelas (se aplicável)" },
+        "installmentValue": { "type": "number", "description": "Valor de cada parcela (se aplicável)" },
+        "status": { 
+          "type": "string", 
+          "enum": ["active", "paid", "overdue"],
+          "description": "Status do empréstimo"
+        },
+        "startDate": { "type": "string", "format": "date-time", "description": "Data de início do contrato" },
+        "nextDueDate": { "type": "string", "format": "date-time", "description": "Data do próximo vencimento" }
+      },
+      "required": ["clientId", "type", "principal", "interestRate", "status"]
+    },
+    "Payment": {
+      "title": "Pagamento",
+      "description": "Registro de entrada de valores referente a um empréstimo.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID do registro de pagamento" },
+        "loanId": { "type": "string", "description": "ID do empréstimo correspondente" },
+        "clientId": { "type": "string", "description": "ID do cliente que realizou o pagamento" },
+        "amount": { "type": "number", "description": "Valor pago" },
+        "date": { "type": "string", "format": "date-time", "description": "Data do pagamento" },
+        "status": { "type": "string", "enum": ["paid"], "description": "Status do pagamento" }
+      },
+      "required": ["loanId", "clientId", "amount", "date", "status"]
+    },
+    "Settings": {
+      "title": "Configurações",
+      "description": "Preferências globais da aplicação.",
+      "type": "object",
+      "properties": {
+        "primaryColor": { "type": "string", "description": "Cor principal da interface" },
+        "theme": { "type": "string", "enum": ["light", "dark"], "description": "Tema visual" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "Perfis de administradores do sistema"
+    },
+    "/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Base de dados de clientes"
+    },
+    "/loans/{loanId}": {
+      "schema": "Loan",
+      "description": "Contratos de empréstimos realizados"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Histórico de pagamentos recebidos"
+    },
+    "/settings/global": {
+      "schema": "Settings",
+      "description": "Configurações globais do sistema"
+    }
+  }
+}

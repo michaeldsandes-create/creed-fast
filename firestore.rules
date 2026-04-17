@@ -1,0 +1,159 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {uid}
+// Fields:
+//   - uid: string (required)
+//   - email: string (required)
+//   - role: string (required, enum: ['admin'])
+//
+// Collection: clients
+// Document ID: {clientId}
+// Fields:
+//   - name: string (required)
+//   - cpf: string (required)
+//   - email: string (required)
+//   - selfieUrl: string (optional)
+//   - address: string (optional)
+//   - requestedAmount: number (optional)
+//   - observation: string (optional)
+//   - status: string (required, enum: ["Em análise", "Aprovado", "Rejeitado", "Aguardando caixa"])
+//   - createdAt: timestamp (required)
+//   - updatedAt: timestamp (required)
+//
+// Collection: loans
+// Document ID: {loanId}
+// Fields:
+//   - clientId: string (required)
+//   - type: string (required, enum: ["simple", "installment"])
+//   - principal: number (required)
+//   - interestRate: number (required)
+//   - totalAmount: number (required)
+//   - remainingAmount: number (required)
+//   - installments: number (optional)
+//   - installmentValue: number (optional)
+//   - status: string (required, enum: ["active", "paid", "overdue"])
+//   - startDate: timestamp (required)
+//   - nextDueDate: timestamp (required)
+//
+// Collection: payments
+// Document ID: {paymentId}
+// Fields:
+//   - loanId: string (required)
+//   - clientId: string (required)
+//   - amount: number (required)
+//   - date: timestamp (required)
+//   - status: string (required, enum: ["paid"])
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      // PROTOTYPE MODE: Allow all access so the mock login works without requiring Firebase Auth configuration.
+      // WARNING: This is insecure and should not be used in production.
+      return true;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidCpf(cpf) {
+      return cpf is string && cpf.size() >= 11 && cpf.size() <= 14;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidClient(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             isValidCpf(data.cpf) &&
+             isValidEmail(data.email) &&
+             data.status in ["Em análise", "Aprovado", "Rejeitado", "Aguardando caixa"] &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidLoan(data) {
+      return data.clientId is string &&
+             data.type in ["simple", "installment"] &&
+             data.principal is number && data.principal > 0 &&
+             data.interestRate is number && data.interestRate >= 0 &&
+             data.status in ["active", "paid", "overdue"] &&
+             data.startDate is timestamp &&
+             data.nextDueDate is timestamp;
+    }
+
+    function isValidPayment(data) {
+      return data.loanId is string &&
+             data.clientId is string &&
+             data.amount is number && data.amount > 0 &&
+             data.date is timestamp &&
+             data.status == "paid";
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // Users collection
+    match /users/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if isAdmin();
+    }
+
+    // Clients collection
+    match /clients/{clientId} {
+      // Public can create (for the registration link)
+      allow create: if isValidClient(request.resource.data) && 
+                      request.resource.data.status == "Em análise";
+      
+      // Only admin can read, list, update, delete
+      allow get, list, delete: if isAdmin();
+      allow update: if isAdmin() && isValidClient(request.resource.data);
+    }
+
+    // Loans collection
+    match /loans/{loanId} {
+      allow get, list, delete: if isAdmin();
+      allow create, update: if isAdmin() && isValidLoan(request.resource.data);
+    }
+
+    // Payments collection
+    match /payments/{paymentId} {
+      allow get, list, delete: if isAdmin();
+      allow create, update: if isAdmin() && isValidPayment(request.resource.data);
+    }
+
+    // Deleted Clients collection
+    match /deleted_clients/{clientId} {
+      allow get, list, create, delete: if isAdmin();
+      allow update: if false;
+    }
+
+    // Settings
+    match /settings/{settingId} {
+      allow read: if true; // Public can read settings (for theme/colors)
+      allow write: if isAdmin();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
