@@ -7,6 +7,8 @@ import { Gem, Info, ShieldCheck, ShieldAlert, Shield, ShieldQuestion, X, Search 
 import { motion, AnimatePresence } from 'motion/react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 import { differenceInDays } from 'date-fns';
+import { analyzeClientCredit } from '../lib/gemini';
+import { Sparkles, BrainCircuit, Loader2 } from 'lucide-react';
 
 const BASE_LIMIT = 2500;
 
@@ -23,153 +25,50 @@ interface ClientIntelligence {
 }
 
 export default function CreditIntelligence() {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [intelligenceRaw, setIntelligenceRaw] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClient, setSelectedClient] = useState<ClientIntelligence | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
-      const { data: clientsData } = await supabase.from('clients').select('*');
-      if (clientsData) setClients(clientsData.map(mapSupabaseClient));
-
-      const { data: loansData } = await supabase.from('loans').select('*');
-      if (loansData) setLoans(loansData.map(mapSupabaseLoan));
-
-      const { data: paymentsData } = await supabase.from('payments').select('*');
-      if (paymentsData) setPayments(paymentsData.map(mapSupabasePayment));
+    const fetchIntelligence = async () => {
+      setLoading(true);
+      const { data, error } = await supabase.rpc('get_client_intelligence');
+      if (data) {
+        setIntelligenceRaw(data);
+      }
+      setLoading(false);
     };
 
-    fetchData();
+    fetchIntelligence();
 
-    const clientsChannel = supabase
-      .channel('public:clients')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
-        fetchData();
-      })
-      .subscribe();
-
-    const loansChannel = supabase
-      .channel('public:loans')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'loans' }, () => {
-        fetchData();
-      })
-      .subscribe();
-
-    const paymentsChannel = supabase
-      .channel('public:payments')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
-        fetchData();
+    const channel = supabase
+      .channel('public:updates')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+        fetchIntelligence();
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(clientsChannel);
-      supabase.removeChannel(loansChannel);
-      supabase.removeChannel(paymentsChannel);
+      supabase.removeChannel(channel);
     };
   }, []);
 
-  useEffect(() => {
-    if (clients.length > 0 && loans.length > 0) {
-      setLoading(false);
-    } else {
-      const timer = setTimeout(() => setLoading(false), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [clients, loans]);
-
   const intelligenceData = useMemo(() => {
-    const data: ClientIntelligence[] = clients.map(client => {
-      const clientLoans = loans.filter(l => l.clientId === client.id);
-      const totalBorrowed = clientLoans.reduce((acc, l) => acc + (l.principal || 0), 0);
-      const totalLoans = clientLoans.length;
-      
-      let onTimeCount = 0;
-      let lateCount = 0;
-      let totalLateDays = 0;
-      let totalInstallmentsEvaluated = 0;
-
-      clientLoans.forEach(loan => {
-        const loanPayments = payments.filter(p => p.loanId === loan.id);
-        
-        // Evaluate based on payments and current status
-        loanPayments.forEach(payment => {
-          totalInstallmentsEvaluated++;
-          if (payment.isLate) {
-            lateCount++;
-            totalLateDays += payment.daysLate || 0;
-          } else {
-            onTimeCount++;
-          }
-        });
-
-        // If loan is currently overdue
-        if (loan.status === 'overdue') {
-          totalInstallmentsEvaluated++;
-          lateCount++;
-          if (loan.nextDueDate) {
-            const dueDate = loan.nextDueDate instanceof Date ? loan.nextDueDate : new Date(loan.nextDueDate);
-            if (!isNaN(dueDate.getTime())) {
-              const days = differenceInDays(new Date(), dueDate);
-              totalLateDays += Math.max(0, days);
-            }
-          }
-        }
-      });
-
-      // If no history, give a neutral score
-      let onTimePercentage = 100;
-      if (totalInstallmentsEvaluated > 0) {
-        onTimePercentage = (onTimeCount / totalInstallmentsEvaluated) * 100;
-      } else {
-        // New clients start neutral
-        onTimePercentage = 80; 
-      }
-
-      const avgLateDays = lateCount > 0 ? totalLateDays / lateCount : 0;
-
-      // Calculate Score (0-100)
-      let score = onTimePercentage;
-      score -= (lateCount * 2); // Penalty for each late payment
-      score -= (avgLateDays * 0.5); // Penalty for average late days
-      score = Math.max(0, Math.min(100, score));
-
-      // Classification
-      let classification: 'Ouro' | 'Bom' | 'Médio' | 'Risco' = 'Médio';
-      let suggestedLimit = BASE_LIMIT * 0.5;
-
-      if (score >= 95) {
-        classification = 'Ouro';
-        suggestedLimit = BASE_LIMIT;
-      } else if (score >= 85) {
-        classification = 'Bom';
-        suggestedLimit = BASE_LIMIT * 0.8;
-      } else if (score >= 70) {
-        classification = 'Médio';
-        suggestedLimit = BASE_LIMIT * 0.5;
-      } else {
-        classification = 'Risco';
-        suggestedLimit = BASE_LIMIT * 0.2;
-      }
-
-      return {
-        client,
-        totalBorrowed,
-        totalLoans,
-        onTimePercentage,
-        lateCount,
-        avgLateDays,
-        score,
-        classification,
-        suggestedLimit
-      };
-    });
-
-    return data.sort((a, b) => b.score - a.score);
-  }, [clients, loans, payments]);
+    return (intelligenceRaw || []).map(d => ({
+      client: { id: d.client_id, name: d.name, cpf: d.cpf },
+      score: d.score,
+      classification: d.classification,
+      suggestedLimit: d.suggested_limit,
+      onTimePercentage: d.on_time_percentage,
+      totalLoans: 0,
+      lateCount: 0,
+      avgLateDays: 0,
+      totalBorrowed: 0
+    })).sort((a, b) => b.score - a.score);
+  }, [intelligenceRaw]);
 
   const chartData = useMemo(() => {
     const counts = { Ouro: 0, Bom: 0, Médio: 0, Risco: 0 };
@@ -420,7 +319,10 @@ export default function CreditIntelligence() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setSelectedClient(null)}
+              onClick={() => {
+                setSelectedClient(null);
+                setAiAnalysis(null);
+              }}
               className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             />
             <motion.div
@@ -440,7 +342,10 @@ export default function CreditIntelligence() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setSelectedClient(null)}
+                  onClick={() => {
+                    setSelectedClient(null);
+                    setAiAnalysis(null);
+                  }}
                   className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
                 >
                   <X size={20} />
@@ -476,10 +381,36 @@ export default function CreditIntelligence() {
                 <div className="bg-indigo-500/10 border border-indigo-500/20 p-6 rounded-2xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 blur-[50px] rounded-full -mr-10 -mt-10 pointer-events-none" />
                   
-                  <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <Gem size={16} />
-                    Recomendação do Sistema
-                  </h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-indigo-300 uppercase tracking-widest flex items-center gap-2">
+                      <Gem size={16} />
+                      Recomendação do Sistema
+                    </h3>
+                    <button
+                      onClick={async () => {
+                        setAiLoading(true);
+                        const result = await analyzeClientCredit(
+                          { 
+                            name: selectedClient.client.name, 
+                            requestedAmount: selectedClient.client.requestedAmount || 0,
+                            observation: selectedClient.client.observation || 'Sem observações'
+                          },
+                          {
+                            score: selectedClient.score,
+                            classification: selectedClient.classification,
+                            on_time_percentage: selectedClient.onTimePercentage
+                          }
+                        );
+                        setAiAnalysis(result);
+                        setAiLoading(false);
+                      }}
+                      disabled={aiLoading}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-500/20"
+                    >
+                      {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                      {aiLoading ? 'Analisando...' : 'Análise de IA'}
+                    </button>
+                  </div>
                   
                   <div className="grid sm:grid-cols-2 gap-6">
                     <div>
@@ -509,6 +440,25 @@ export default function CreditIntelligence() {
                     </p>
                   </div>
                 </div>
+
+                {/* AI Analysis Result */}
+                <AnimatePresence>
+                  {aiAnalysis && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 p-6 rounded-2xl relative overflow-hidden"
+                    >
+                      <div className="flex items-center gap-2 mb-4 text-indigo-300">
+                        <BrainCircuit size={20} />
+                        <h3 className="text-sm font-bold uppercase tracking-widest">Parecer Técnico da IA</h3>
+                      </div>
+                      <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-medium">
+                        {aiAnalysis}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </motion.div>
           </div>

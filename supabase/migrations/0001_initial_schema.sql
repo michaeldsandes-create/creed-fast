@@ -97,14 +97,50 @@ ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.loans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.deleted_clients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 
--- Create Policies (Simplified for Admin access based on the prototype)
--- In production, you would check if the user has the 'admin' role in public.users
-CREATE POLICY "Enable read access for all authenticated users" ON public.users FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable all access for authenticated users" ON public.clients FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable all access for authenticated users" ON public.loans FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable all access for authenticated users" ON public.payments FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable all access for authenticated users" ON public.deleted_clients FOR ALL USING (auth.role() = 'authenticated');
+-- 1. Users Policies
+CREATE POLICY "Users can view their own profile" ON public.users FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Admins can view all profiles" ON public.users FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+
+-- 2. Clients Policies
+CREATE POLICY "Admins can manage all clients" ON public.clients FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Enable public registration" ON public.clients FOR INSERT WITH CHECK (true);
+CREATE POLICY "Clients can view their own data (by CPF/Email match if linked)" ON public.clients FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND (email = public.clients.email OR role = 'admin'))
+);
+
+-- 3. Loans Policies
+CREATE POLICY "Admins can manage all loans" ON public.loans FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Users can view their own loans" ON public.loans FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.clients 
+    WHERE id = public.loans.client_id 
+    AND (email = (SELECT email FROM auth.users WHERE id = auth.uid()) OR EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'))
+  )
+);
+
+-- 4. Payments Policies
+CREATE POLICY "Admins can manage all payments" ON public.payments FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+
+-- 5. Settings Policies
+CREATE POLICY "Everyone can view settings" ON public.settings FOR SELECT USING (true);
+CREATE POLICY "Only admins can update settings" ON public.settings FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+
+-- 6. Deleted Clients (Audit log)
+CREATE POLICY "Only admins can view audit log" ON public.deleted_clients FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
 
 -- Create function to automatically update 'updated_at' on clients
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -119,3 +155,50 @@ CREATE TRIGGER update_clients_updated_at
     BEFORE UPDATE ON public.clients
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Function for Credit Intelligence (Server-side calculation)
+CREATE OR REPLACE FUNCTION get_client_intelligence()
+RETURNS TABLE (
+    client_id UUID,
+    name TEXT,
+    cpf TEXT,
+    score NUMERIC,
+    classification TEXT,
+    suggested_limit NUMERIC,
+    on_time_percentage NUMERIC
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH client_stats AS (
+        SELECT 
+            c.id,
+            c.name,
+            c.cpf,
+            COUNT(l.id) as total_loans,
+            COALESCE(AVG(CASE WHEN p.is_late THEN 0 ELSE 100 END), 80) as on_time_pct
+        FROM public.clients c
+        LEFT JOIN public.loans l ON l.client_id = c.id
+        LEFT JOIN public.payments p ON p.loan_id = l.id
+        GROUP BY c.id, c.name, c.cpf
+    )
+    SELECT 
+        id as client_id,
+        name,
+        cpf,
+        on_time_pct as score,
+        CASE 
+            WHEN on_time_pct >= 95 THEN 'Ouro'
+            WHEN on_time_pct >= 85 THEN 'Bom'
+            WHEN on_time_pct >= 70 THEN 'Médio'
+            ELSE 'Risco'
+        END as classification,
+        CASE 
+            WHEN on_time_pct >= 95 THEN 2500
+            WHEN on_time_pct >= 85 THEN 2000
+            WHEN on_time_pct >= 70 THEN 1250
+            ELSE 500
+        END as suggested_limit,
+        on_time_pct as on_time_percentage
+    FROM client_stats;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

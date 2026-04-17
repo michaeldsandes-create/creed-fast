@@ -108,6 +108,26 @@ export default function PublicRegister() {
 
       const fullAddress = `${street}, ${number}, ${neighborhood}, ${city} - ${state}, CEP: ${cep}`;
 
+      // Upload selfie to storage
+      const fileExt = selfie.split(';')[0].split('/')[1];
+      const fileName = `${cleanCpf}-${Date.now()}.${fileExt}`;
+      const filePath = `selfies/${fileName}`;
+
+      // Convert base64 to blob
+      const base64Data = selfie.split(',')[1];
+      const res = await fetch(`data:image/${fileExt};base64,${base64Data}`);
+      const blob = await res.blob();
+
+      const { error: uploadError } = await supabase.storage
+        .from('selfies')
+        .upload(filePath, blob);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('selfies')
+        .getPublicUrl(filePath);
+
       const { error: insertError } = await supabase.from('clients').insert(mapClientToSupabase({
         id: '', // Supabase will generate this
         name,
@@ -116,7 +136,7 @@ export default function PublicRegister() {
         address: fullAddress,
         requestedAmount: unmaskCurrency(requestedAmount),
         observation,
-        selfieUrl: selfie, // In a real app, upload to storage first
+        selfieUrl: publicUrl,
         status: 'Em análise',
         createdAt: new Date(),
         updatedAt: new Date(),
