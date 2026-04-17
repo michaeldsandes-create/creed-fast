@@ -94,7 +94,7 @@ export default function Layout() {
             <TrendingUp className="text-white" size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-emerald-500 tracking-tighter italic leading-none">CREED-FAST</h1>
+            <h1 className="text-2xl font-bold text-emerald-500 tracking-tighter italic leading-none">CREED-PRO</h1>
             <span className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Version 2.0 (Alpha)</span>
           </div>
         </div>
@@ -139,7 +139,7 @@ export default function Layout() {
             <TrendingUp className="text-white" size={20} />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-emerald-500 tracking-tighter italic leading-none">CREED-FAST</h1>
+            <h1 className="text-xl font-bold text-emerald-500 tracking-tighter italic leading-none">CREED-PRO</h1>
             <span className="text-[8px] font-bold text-slate-500 tracking-widest uppercase">Version 2.0 (Alpha)</span>
           </div>
         </div>
@@ -171,7 +171,7 @@ export default function Layout() {
                     <TrendingUp className="text-white" size={24} />
                   </div>
                   <div>
-                    <h1 className="text-2xl font-bold text-emerald-500 tracking-tighter italic leading-none">CREED-FAST</h1>
+                    <h1 className="text-2xl font-bold text-emerald-500 tracking-tighter italic leading-none">CREED-PRO</h1>
                     <span className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Version 2.0 (Alpha)</span>
                   </div>
                 </div>

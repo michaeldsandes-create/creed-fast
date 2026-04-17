@@ -241,7 +241,7 @@ export default function Settings() {
           <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-3xl p-8">
             <div className="flex items-center gap-3 mb-4">
               <Info className="text-emerald-500" size={24} />
-              <h3 className="text-xl font-bold text-white">Sobre o CREED-FAST</h3>
+              <h3 className="text-xl font-bold text-white">Sobre o CREED-PRO</h3>
             </div>
             <p className="text-slate-400 text-sm leading-relaxed">
               Version 2.0.0 (Alpha)<br />

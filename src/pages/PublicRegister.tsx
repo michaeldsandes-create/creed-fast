@@ -181,7 +181,7 @@ export default function PublicRegister() {
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 py-12">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-emerald-500 tracking-tighter mb-2 italic">CREED-FAST</h1>
+          <h1 className="text-4xl font-bold text-emerald-500 tracking-tighter mb-2 italic">CREED-PRO</h1>
           <p className="text-slate-400">Solicitação de Crédito Rápido e Seguro</p>
         </div>
 
