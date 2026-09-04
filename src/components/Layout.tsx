@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
+const DEFAULT_ADMIN_EMAIL = 'michaeldsandes@gmail.com';
+
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/clients', icon: Users, label: 'Clientes' },
@@ -33,16 +35,19 @@ export default function Layout() {
       if (!user) return;
       
       setUserEmail(user.email || null);
+      const normalizedEmail = user.email?.trim().toLowerCase() || null;
 
       // Check if user is the default admin email
-      if (user.email === 'michaeldsandes@gmail.com') {
+      if (normalizedEmail === DEFAULT_ADMIN_EMAIL) {
         setIsAdmin(true);
         return;
       }
 
       // Check if user has admin role in Supabase
       try {
-        const { data, error } = await supabase.from('users').select('role').eq('id', user.id).single();
+        const { data, error } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
+        if (error) throw error;
+
         if (data && data.role === 'admin') {
           setIsAdmin(true);
         } else {

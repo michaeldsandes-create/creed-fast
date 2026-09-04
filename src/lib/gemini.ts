@@ -1,11 +1,13 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(apiKey);
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+const genAI = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export const analyzeClientCredit = async (clientData: any, financialHistory: any) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    if (!genAI) {
+      throw new Error('Gemini API key is missing.');
+    }
 
     const prompt = `
       Você é um analista de crédito especialista em microcrédito. 
@@ -27,9 +29,12 @@ export const analyzeClientCredit = async (clientData: any, financialHistory: any
       3. Uma sugestão de limite máximo seguro.
     `;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
+    const response = await genAI.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: prompt,
+    });
+
+    return response.text || "Não foi possível realizar a análise de IA no momento.";
   } catch (error) {
     console.error("Erro na análise do Gemini:", error);
     return "Não foi possível realizar a análise de IA no momento.";

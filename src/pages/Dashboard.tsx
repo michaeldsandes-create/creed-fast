@@ -375,12 +375,14 @@ export default function Dashboard() {
 
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 shrink-0">
+          <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.2)] shrink-0">
             <LayoutDashboard className="text-emerald-500" size={32} />
           </div>
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Dashboard</h2>
-            <p className="text-sm md:text-base text-slate-400 mt-1">Visão geral do seu negócio de crédito</p>
+            <h2 className="bg-gradient-to-r from-emerald-300 via-cyan-300 to-emerald-400 bg-clip-text text-2xl font-black leading-none tracking-[0.08em] text-transparent drop-shadow-[0_0_18px_rgba(45,212,191,0.25)] md:text-3xl">
+              PAINEL DE CONTROLE
+            </h2>
+            <p className="mt-2 text-sm font-medium tracking-wide text-slate-400 md:text-base">Visão geral do seu negócio de crédito</p>
           </div>
         </div>
       </header>
@@ -409,9 +411,11 @@ export default function Dashboard() {
                 </div>
                 <ArrowRight size={20} className="text-slate-600 group-hover:text-white transition-colors shrink-0" />
               </div>
-              <div className="space-y-1.5 overflow-hidden">
+              <div className="space-y-1.5 min-w-0">
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest truncate">{stat.label}</p>
-                <h3 className="text-lg sm:text-xl font-black text-white tracking-tight whitespace-nowrap">{stat.value}</h3>
+                <h3 className="max-w-full break-words text-base font-black leading-tight tracking-tight text-white sm:text-lg xl:text-xl">
+                  {stat.value}
+                </h3>
               </div>
             </div>
           </motion.div>
