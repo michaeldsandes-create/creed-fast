@@ -79,6 +79,10 @@ export default function PublicRegister() {
         .from('clients')
         .select('id')
         .eq('cpf', cleanCpf);
+
+      if (checkError) {
+        throw checkError;
+      }
       
       if (existingClients && existingClients.length > 0) {
         setError('Este CPF já está cadastrado no sistema.');
@@ -129,7 +133,6 @@ export default function PublicRegister() {
         .getPublicUrl(filePath);
 
       const { error: insertError } = await supabase.from('clients').insert(mapClientToSupabase({
-        id: '', // Supabase will generate this
         name,
         cpf: cleanCpf,
         email: cleanEmail,
@@ -149,6 +152,7 @@ export default function PublicRegister() {
       setSuccess(true);
     } catch (err) {
       console.error("Error registering client:", err);
+      setError(err instanceof Error ? err.message : 'Não foi possível enviar o cadastro. Tente novamente.');
     } finally {
       setLoading(false);
     }
