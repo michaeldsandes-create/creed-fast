@@ -70,7 +70,7 @@ export default function Loans() {
     };
 
     const fetchClients = async () => {
-      const { data, error } = await supabase.from('clients').select('*');
+      const { data, error } = await supabase.from('clients').select('id,name,cpf,email,address,requested_amount,monthly_income,observation,status,client_type,created_at,updated_at');
       if (data) {
         const clientsMap: Record<string, Client> = {};
         data.map(mapSupabaseClient).forEach(c => {
@@ -149,7 +149,7 @@ export default function Loans() {
       if (editingLoan) {
         const amountPaid = editingLoan.totalAmount - editingLoan.remainingAmount;
         const newRemainingAmount = totalAmount - amountPaid;
-        
+
         const { error: updateError } = await supabase.from('loans').update(mapLoanToSupabase({
           clientId: selectedClientId,
           type: loanType,
@@ -161,7 +161,7 @@ export default function Loans() {
           installmentValue,
           nextDueDate: nextDueDate,
         })).eq('id', editingLoan.id);
-        
+
         if (updateError) {
           console.error("Error updating loan:", updateError);
           setError('Erro ao atualizar empréstimo.');
@@ -183,7 +183,7 @@ export default function Loans() {
           startDate: new Date(),
           nextDueDate: nextDueDate,
         }));
-        
+
         if (insertError) {
           console.error("Error saving loan:", insertError);
           setError('Erro ao salvar empréstimo.');
@@ -191,7 +191,7 @@ export default function Loans() {
           return;
         }
       }
-      
+
       closeLoanModal();
     } catch (err) {
       console.error(err);
@@ -222,14 +222,14 @@ export default function Loans() {
     setPrincipal(formatCurrency(loan.principal));
     setInterestRate(loan.type === 'simple' ? loan.interestRate.toString() : formatCurrency(loan.interestRate));
     setInstallments((loan.installments || 1).toString());
-    
+
     if (loan.nextDueDate) {
       const d = loan.nextDueDate instanceof Date ? loan.nextDueDate : new Date(loan.nextDueDate);
       if (!isNaN(d.getTime())) {
         setDueDate(d.toISOString().split('T')[0]);
       }
     }
-    
+
     setShowLoanModal(true);
   };
 
@@ -237,7 +237,7 @@ export default function Loans() {
     e.stopPropagation();
     setDeleteModal({ isOpen: true, loanId });
   };
-  
+
   const confirmDelete = async () => {
     if (!deleteModal.loanId) return;
     try {
@@ -250,7 +250,7 @@ export default function Loans() {
 
   const { filteredLoans, validLoans, stats } = useMemo(() => {
     const valid = loans.filter(l => clients[l.clientId]);
-    
+
     const filtered = valid.filter(loan => {
       const client = clients[loan.clientId];
       const matchesSearch = client.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -467,7 +467,7 @@ export default function Loans() {
               </AnimatePresence>
             </tbody>
           </table>
-          
+
           {filteredLoans.length === 0 && !loading && (
             <div className="p-12 text-center">
               <div className="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-500">
