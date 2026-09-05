@@ -1,4 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Logo } from './Logo';
 import { LayoutDashboard, Users, UserPlus, Settings, LogOut, Menu, X, TrendingUp, ShieldAlert, DollarSign, Gem } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
@@ -33,7 +34,7 @@ export default function Layout() {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      
+
       setUserEmail(user.email || null);
       const normalizedEmail = user.email?.trim().toLowerCase() || null;
 
@@ -94,14 +95,8 @@ export default function Layout() {
     <div className="h-screen bg-slate-950 text-slate-100 flex overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 flex-shrink-0">
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-600/20">
-            <TrendingUp className="text-white" size={24} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-emerald-500 tracking-tighter italic leading-none">CREED-PRO</h1>
-            <span className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Version 2.0 (Alpha)</span>
-          </div>
+        <div className="p-6 flex justify-center">
+          <Logo size={104} animated />
         </div>
         <nav className="flex-1 px-4 space-y-2">
           {navItems.map((item) => (
@@ -139,15 +134,7 @@ export default function Layout() {
 
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 z-50">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-600/20">
-            <TrendingUp className="text-white" size={20} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-emerald-500 tracking-tighter italic leading-none">CREED-PRO</h1>
-            <span className="text-[8px] font-bold text-slate-500 tracking-widest uppercase">Version 2.0 (Alpha)</span>
-          </div>
-        </div>
+        <Logo size={44} tagline={false} />
         <button onClick={() => setIsSidebarOpen(true)} className="text-slate-100">
           <Menu size={24} />
         </button>
@@ -171,15 +158,7 @@ export default function Layout() {
               className="fixed top-0 left-0 bottom-0 w-64 bg-slate-900 z-[70] md:hidden flex flex-col"
             >
               <div className="p-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-600/20">
-                    <TrendingUp className="text-white" size={24} />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold text-emerald-500 tracking-tighter italic leading-none">CREED-PRO</h1>
-                    <span className="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Version 2.0 (Alpha)</span>
-                  </div>
-                </div>
+                <Logo size={88} />
                 <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400">
                   <X size={24} />
                 </button>
