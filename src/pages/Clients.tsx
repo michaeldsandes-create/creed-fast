@@ -45,7 +45,7 @@ export default function Clients() {
     };
 
     const fetchClients = async () => {
-      const { data, error } = await supabase.from('clients').select('*');
+      const { data, error } = await supabase.from('clients').select('id,name,cpf,email,address,requested_amount,monthly_income,observation,status,client_type,created_at,updated_at');
       if (data) {
         setClients(data.map(mapSupabaseClient));
       }
@@ -73,7 +73,7 @@ export default function Clients() {
   useEffect(() => {
     const checkAguardandoCaixa = async () => {
       const aguardando = clients.filter(c => c.status === 'Aguardando caixa');
-      
+
       const approvalPromises = aguardando.map(async (client) => {
         if (client.requestedAmount && availableCapital >= client.requestedAmount) {
           try {
@@ -81,11 +81,11 @@ export default function Clients() {
               status: 'Aprovado',
               updated_at: new Date().toISOString()
             }).eq('id', client.id);
-            
+
             // Show email notification
             setEmailNotification({ show: true, clientName: client.name });
             setTimeout(() => setEmailNotification({ show: false, clientName: '' }), 5000);
-            
+
             // Send real email notification (fire and forget)
             sendEmailNotification(
               client.email,
@@ -97,7 +97,7 @@ export default function Clients() {
           }
         }
       });
-      
+
       if (approvalPromises.length > 0) {
         await Promise.all(approvalPromises);
       }
@@ -120,7 +120,7 @@ export default function Clients() {
 
   const handleDelete = async () => {
     if (!deleteModal.clientId) return;
-    
+
     setIsDeleting(true);
     try {
       const clientToDelete = clients.find(c => c.id === deleteModal.clientId);
@@ -387,7 +387,7 @@ export default function Clients() {
               </AnimatePresence>
             </tbody>
           </table>
-          
+
           {filteredClients.length === 0 && !loading && (
             <div className="p-12 text-center">
               <div className="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-500">
