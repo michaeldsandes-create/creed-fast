@@ -55,7 +55,7 @@ export default function Dashboard() {
 
     const fetchClients = async () => {
       try {
-        const { data, error } = await supabase.from('clients').select('*');
+        const { data, error } = await supabase.from('clients').select('id,name,cpf,email,address,requested_amount,monthly_income,observation,status,client_type,created_at,updated_at');
         if (error) throw error;
         if (data) {
           setClients(data.map(mapSupabaseClient));
@@ -135,7 +135,7 @@ export default function Dashboard() {
     const overdueLoans = loans.filter(l => l.status === 'overdue' && clientIds.has(l.clientId));
 
     const todayActions: { id: string, type: 'payment' | 'overdue' | 'due' | 'pending', title: string, subtitle: string, amount: number, date: Date, clientId: string, client?: Client, loan?: Loan }[] = [];
-    
+
     loansDueToday.forEach(loan => {
       const client = clientMap.get(loan.clientId);
       if (client) todayActions.push({ id: `due-${loan.id}`, type: 'due', title: 'Pagamento Hoje', subtitle: client.name, amount: loan.principal, date: loan.nextDueDate?.toDate ? loan.nextDueDate.toDate() : new Date(), clientId: client.id, loan, client });
@@ -161,12 +161,13 @@ export default function Dashboard() {
       }).reduce((acc, l) => acc + (l.installmentValue || 0), 0);
       return { date: d, amount };
     });
+
     const max7DaysAmount = Math.max(...next7Days.map(d => d.amount), 1);
 
     const cashflowData = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date(today);
       d.setDate(d.getDate() + i);
-      
+
       const inflow = activeLoans.filter(l => {
         if (!l.nextDueDate) return false;
         const dueDate = l.nextDueDate?.toDate ? l.nextDueDate.toDate() : new Date(l.nextDueDate);
@@ -193,7 +194,7 @@ export default function Dashboard() {
       const totalDebt = clientLoans.reduce((acc, l) => acc + (l.remainingAmount || 0), 0);
       return { client, totalDebt };
     }).filter(c => c.totalDebt > 0);
-    
+
     const topDebtors = clientDebts.sort((a, b) => b.totalDebt - a.totalDebt).slice(0, 3);
 
     const loansInterestThisMonth = activeLoans.filter(l => {
@@ -233,51 +234,51 @@ export default function Dashboard() {
   }, [loans, clients]);
 
   const stats = [
-    { 
-      label: 'Capital Ativo', 
-      value: formatCurrency(totalActive), 
-      icon: DollarSign, 
-      color: 'text-emerald-400', 
+    {
+      label: 'Capital Ativo',
+      value: formatCurrency(totalActive),
+      icon: DollarSign,
+      color: 'text-emerald-400',
       bg: 'bg-emerald-500/10',
       gradient: 'from-emerald-500/20 to-emerald-900/20',
       shadow: 'shadow-emerald-500/20',
       type: 'active' as const
     },
-    { 
-      label: 'Emprestado no Mês', 
-      value: formatCurrency(borrowedThisMonth), 
-      icon: TrendingUp, 
-      color: 'text-blue-400', 
+    {
+      label: 'Emprestado no Mês',
+      value: formatCurrency(borrowedThisMonth),
+      icon: TrendingUp,
+      color: 'text-blue-400',
       bg: 'bg-blue-500/10',
       gradient: 'from-blue-500/20 to-blue-900/20',
       shadow: 'shadow-blue-500/20',
       type: 'month' as const
     },
-    { 
-      label: 'Vencimentos Hoje', 
-      value: loansDueToday.length, 
-      icon: Calendar, 
-      color: 'text-purple-400', 
+    {
+      label: 'Vencimentos Hoje',
+      value: loansDueToday.length,
+      icon: Calendar,
+      color: 'text-purple-400',
       bg: 'bg-purple-500/10',
       gradient: 'from-purple-500/20 to-purple-900/20',
       shadow: 'shadow-purple-500/20',
       type: 'today' as const
     },
-    { 
-      label: 'Em Atraso', 
-      value: overdueLoans.length, 
-      icon: AlertTriangle, 
-      color: 'text-rose-400', 
+    {
+      label: 'Em Atraso',
+      value: overdueLoans.length,
+      icon: AlertTriangle,
+      color: 'text-rose-400',
       bg: 'bg-rose-500/10',
       gradient: 'from-rose-500/20 to-rose-900/20',
       shadow: 'shadow-rose-500/20',
       type: 'overdue' as const
     },
-    { 
-      label: 'Receber no Mês', 
-      value: formatCurrency(interestToReceiveThisMonth), 
-      icon: Wallet, 
-      color: 'text-amber-400', 
+    {
+      label: 'Receber no Mês',
+      value: formatCurrency(interestToReceiveThisMonth),
+      icon: Wallet,
+      color: 'text-amber-400',
       bg: 'bg-amber-500/10',
       gradient: 'from-amber-500/20 to-amber-900/20',
       shadow: 'shadow-amber-500/20',
@@ -301,14 +302,14 @@ export default function Dashboard() {
       await supabase.from('clients').update({
         status: 'Aprovado'
       }).eq('id', client.id);
-      
+
       // Fire and forget
       sendEmailNotification(
         client.email,
         `Crédito Liberado - CREED-FAST`,
         `Olá ${client.name}, seu crédito foi liberado! Já temos o valor disponível conforme solicitado.`
       );
-      
+
       setEmailNotification({ show: true, clientName: client.name });
       setTimeout(() => setEmailNotification({ show: false, clientName: '' }), 5000);
     } catch (error) {
@@ -341,7 +342,7 @@ export default function Dashboard() {
         <div className="bg-slate-900 p-4 rounded-xl text-xs font-mono text-rose-400 overflow-auto max-w-full">
           {fetchError}
         </div>
-        <button 
+        <button
           onClick={() => window.location.reload()}
           className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2 rounded-xl transition-colors"
         >
@@ -403,7 +404,7 @@ export default function Dashboard() {
             )}
           >
             <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", stat.gradient)} />
-            
+
             <div className="relative z-10 flex flex-col h-full justify-between min-h-[140px]">
               <div className="flex items-center justify-between mb-4">
                 <div className={cn("p-3 rounded-2xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-lg shrink-0", stat.bg)}>
@@ -427,7 +428,7 @@ export default function Dashboard() {
           {/* Ações do Dia */}
           <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/50 p-6 rounded-3xl shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 blur-[80px] rounded-full pointer-events-none" />
-            
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 relative z-10 gap-4">
               <h3 className="text-lg font-bold text-white flex items-center gap-3">
                 <div className="p-3 bg-blue-500/10 rounded-xl shrink-0">
@@ -438,8 +439,8 @@ export default function Dashboard() {
               <div className="flex items-end gap-1 h-8 shrink-0" title="Previsão de recebimentos (7 dias)">
                 {next7Days.map((day, i) => (
                   <div key={i} className="w-2 bg-slate-800 rounded-t-sm relative group">
-                    <div 
-                      className="absolute bottom-0 left-0 right-0 bg-blue-500 rounded-t-sm transition-all" 
+                    <div
+                      className="absolute bottom-0 left-0 right-0 bg-blue-500 rounded-t-sm transition-all"
                       style={{ height: day.amount > 0 ? `${Math.max(20, (day.amount / max7DaysAmount) * 100)}%` : '0%' }}
                     />
                   </div>
@@ -451,7 +452,7 @@ export default function Dashboard() {
               {todayActions.length > 0 ? (
                 <div className="space-y-3">
                   {todayActions.slice(0, 4).map((action, i) => (
-                    <Link 
+                    <Link
                       key={action.id}
                       to={`/clients/${action.client.id}`}
                       className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-800/40 backdrop-blur-sm rounded-2xl border border-slate-700/30 hover:border-blue-500/30 hover:bg-slate-800/60 transition-all duration-300 group gap-4"
@@ -507,7 +508,7 @@ export default function Dashboard() {
           <div className="bg-gradient-to-br from-indigo-900/40 via-purple-900/40 to-slate-900/80 backdrop-blur-xl border border-indigo-500/20 p-8 rounded-3xl shadow-2xl shadow-indigo-500/10 relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 blur-[100px] rounded-full -mr-20 -mt-20 pointer-events-none transition-transform duration-700 group-hover:scale-150" />
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/20 blur-[100px] rounded-full -ml-20 -mb-20 pointer-events-none transition-transform duration-700 group-hover:scale-150" />
-            
+
             <h3 className="text-lg md:text-xl font-bold text-white mb-8 flex flex-wrap items-center gap-3 relative z-10">
               <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-500/30 shrink-0">
                 <TrendingUp className="text-indigo-400" size={20} />
@@ -515,15 +516,15 @@ export default function Dashboard() {
               Inteligência Financeira
               <span className="ml-auto md:ml-auto text-[10px] font-bold uppercase tracking-widest bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full border border-indigo-500/30">Premium</span>
             </h3>
-            
+
             {(() => {
               const totalOverdueAmount = overdueLoans.reduce((acc, l) => acc + (l.remainingAmount || 0), 0);
               const delinquencyRate = totalActive > 0 ? (totalOverdueAmount / totalActive) * 100 : 0;
-              
+
               let healthStatus = 'Excelente';
               let healthColor = 'text-emerald-400';
               let healthSuggestion = 'Continue com a mesma política de crédito. O risco está muito bem controlado.';
-              
+
               if (delinquencyRate > 15) {
                 healthStatus = 'Crítico';
                 healthColor = 'text-rose-500';
@@ -546,7 +547,7 @@ export default function Dashboard() {
                       <p className="text-lg md:text-xl font-black text-white tracking-tight drop-shadow-md whitespace-nowrap">{formatCurrency(totalOverdueAmount)}</p>
                     </div>
                   </div>
-                  
+
                   <div className="bg-slate-900/50 backdrop-blur-md p-6 rounded-2xl border border-indigo-500/20">
                     <div className="flex items-center gap-3 mb-3">
                       <p className="text-sm font-bold text-slate-300">Saúde da Carteira:</p>
@@ -568,9 +569,10 @@ export default function Dashboard() {
               </div>
               Status dos Clientes
             </h3>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Em análise */}
-              <div 
+              <div
                 onClick={() => setSelectedStatus(selectedStatus === 'Em análise' ? null : 'Em análise')}
                 className={cn(
                   "bg-slate-800/50 backdrop-blur-md border p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg",
@@ -589,7 +591,7 @@ export default function Dashboard() {
                 <div className="relative z-10">
                   <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-2">Em análise</h3>
                   <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
-                    <motion.div 
+                    <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${clients.length ? (clients.filter(c => c.status === 'Em análise').length / clients.length) * 100 : 0}%` }}
                       transition={{ duration: 1, ease: "easeOut" }}
@@ -600,7 +602,7 @@ export default function Dashboard() {
               </div>
 
               {/* Aprovados */}
-              <div 
+              <div
                 onClick={() => setSelectedStatus(selectedStatus === 'Aprovado' ? null : 'Aprovado')}
                 className={cn(
                   "bg-slate-800/50 backdrop-blur-md border p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg",
@@ -623,7 +625,7 @@ export default function Dashboard() {
               </div>
 
               {/* Reprovados */}
-              <div 
+              <div
                 onClick={() => setSelectedStatus(selectedStatus === 'Rejeitado' ? null : 'Rejeitado')}
                 className={cn(
                   "bg-slate-800/50 backdrop-blur-md border p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg",
@@ -646,7 +648,7 @@ export default function Dashboard() {
               </div>
 
               {/* Aguardando caixa */}
-              <div 
+              <div
                 onClick={() => setSelectedStatus(selectedStatus === 'Aguardando caixa' ? null : 'Aguardando caixa')}
                 className={cn(
                   "bg-slate-800/50 backdrop-blur-md border p-5 rounded-2xl relative overflow-hidden group cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg",
@@ -685,7 +687,7 @@ export default function Dashboard() {
                         <X size={16} />
                       </button>
                     </div>
-                    
+
                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                       {clients.filter(c => c.status === selectedStatus).length === 0 ? (
                         <p className="text-sm text-slate-500 text-center py-4">Nenhum cliente neste status.</p>
@@ -707,7 +709,7 @@ export default function Dashboard() {
                               <div className="text-left sm:text-right shrink-0">
                                 <p className="text-sm font-bold text-white whitespace-nowrap">{client.requestedAmount ? formatCurrency(client.requestedAmount) : '-'}</p>
                               </div>
-                              
+
                               {selectedStatus === 'Aguardando caixa' && (
                                 <button
                                   onClick={() => handleNotifyClient(client)}
@@ -737,13 +739,13 @@ export default function Dashboard() {
               </div>
               Fluxo de Caixa (7 dias)
             </h3>
-            
+
             <div className="h-48 mb-6 w-full" style={{ minHeight: 192 }}>
               <ResponsiveContainer width="99%" height="99%" minWidth={1} minHeight={1}>
                 <BarChart data={cashflowData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                   <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$ ${value}`} />
-                  <Tooltip 
+                  <Tooltip
                     cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', color: '#f8fafc' }}
                     itemStyle={{ fontSize: '14px', fontWeight: 'bold' }}
@@ -780,7 +782,7 @@ export default function Dashboard() {
                 </div>
                 Top Devedores
               </h3>
-              
+
               <div className="space-y-3">
                 {topDebtors.map(({ client, totalDebt }, index) => (
                   <div key={client.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-800/40 rounded-2xl border border-slate-700/30 hover:border-slate-600 transition-colors gap-3">
@@ -806,7 +808,6 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-
         </div>
       </div>
 
@@ -821,6 +822,7 @@ export default function Dashboard() {
               onClick={() => setSummaryModal({ ...summaryModal, isOpen: false })}
               className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             />
+
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -829,7 +831,7 @@ export default function Dashboard() {
             >
               <div className="flex items-center justify-between mb-6 md:mb-8">
                 <h3 className="text-xl md:text-2xl font-black text-white tracking-tight">{summaryModal.title}</h3>
-                <button 
+                <button
                   onClick={() => setSummaryModal({ ...summaryModal, isOpen: false })}
                   className="p-2 bg-slate-800/50 hover:bg-slate-700/50 rounded-full text-slate-400 hover:text-white transition-all shrink-0"
                 >
@@ -841,7 +843,7 @@ export default function Dashboard() {
                 {getSummaryData().map((loan: Loan) => {
                   const client = clients.find(c => c.id === loan.clientId);
                   const dueDate = loan.nextDueDate?.toDate ? loan.nextDueDate.toDate() : (loan.nextDueDate ? new Date(loan.nextDueDate) : new Date());
-                  
+
                   return (
                     <div
                       key={loan.id}
@@ -867,10 +869,11 @@ export default function Dashboard() {
                           </p>
                         </div>
                       </Link>
+
                       <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 mt-2 sm:mt-0 pt-4 sm:pt-0 border-t border-slate-700/50 sm:border-0">
                         <div className="text-left sm:text-right shrink-0">
                           <p className="text-lg font-black text-white tracking-tight whitespace-nowrap">
-                            {summaryModal.type === 'interest' 
+                            {summaryModal.type === 'interest'
                               ? formatCurrency(loan.type === 'simple' ? (loan.installmentValue || 0) : ((loan.interestRate || 0) / (loan.installments || 1)))
                               : formatCurrency(loan.remainingAmount)}
                           </p>
@@ -895,6 +898,7 @@ export default function Dashboard() {
                     </div>
                   );
                 })}
+
                 {getSummaryData().length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-slate-500">Nenhum registro encontrado para este resumo.</p>
