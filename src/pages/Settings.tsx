@@ -49,11 +49,27 @@ export default function Settings() {
     setSettings(newSettings);
     setSaving(true);
     try {
-      await supabase.from('settings').upsert({ id: 'app', ...mapSettingsToSupabase(newSettings), updated_at: new Date().toISOString() });
+      const { error } = await supabase
+        .from('settings')
+        .update({ ...mapSettingsToSupabase(newSettings), updated_at: new Date().toISOString() })
+        .eq('id', 'app');
+
+      if (error) throw error;
+
+      // Aplica a cor imediatamente, sem precisar recarregar a pagina
+      if (newSettings.cor_primaria) {
+        document.documentElement.style.setProperty('--primary-color', newSettings.cor_primaria);
+      }
+      const root = document.documentElement;
+      root.classList.remove('light', 'dark', 'claro', 'escuro');
+      root.classList.add(newSettings.tema === 'claro' ? 'light' : 'dark');
+
+      setErrorMsg(null);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving settings:", error);
+      setErrorMsg(error?.message || 'Nao foi possivel salvar as configuracoes.');
     } finally {
       setSaving(false);
     }
@@ -190,7 +206,7 @@ export default function Settings() {
               <button
                 onClick={async () => {
                   const newValue = !settings.biometria;
-                  
+
                   if (newValue) {
                     // Request biometric auth
                     if (window.PublicKeyCredential) {
@@ -213,7 +229,7 @@ export default function Settings() {
                       return;
                     }
                   }
-                  
+
                   handleSave({ ...settings, biometria: newValue });
                 }}
                 className="w-full flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-slate-700 hover:bg-slate-800 transition-colors"
@@ -262,7 +278,7 @@ export default function Settings() {
           <UserX className="text-rose-500" size={24} />
           <h3 className="text-xl font-bold text-white">Clientes Excluídos</h3>
         </div>
-        
+
         {deletedClients.length === 0 ? (
           <p className="text-slate-500 text-sm">Nenhum cliente excluído encontrado.</p>
         ) : (
@@ -270,7 +286,7 @@ export default function Settings() {
             {deletedClients.map(client => {
               const deletedDate = client.deletedAt?.toDate ? client.deletedAt.toDate() : new Date();
               const totalBorrowed = client.loans?.reduce((acc: number, l: any) => acc + (l.principal || 0), 0) || 0;
-              
+
               return (
                 <div key={client.id} className="flex flex-col p-4 bg-slate-800/30 rounded-2xl border border-slate-800 gap-4">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -306,7 +322,7 @@ export default function Settings() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {client.loans && client.loans.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-slate-700/50">
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Histórico de Empréstimos</p>
