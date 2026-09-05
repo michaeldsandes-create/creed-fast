@@ -67,7 +67,6 @@ export function FinancialReportModal({ isOpen, onClose, client, loan }: Financia
     try {
       // Renderiza em largura fixa (proporção A4) para captura estável
       const originalStyle = element.style.cssText;
-      element.style.width = '794px'; // ~A4 @96dpi
       element.style.maxHeight = 'none';
       element.style.overflow = 'visible';
       element.style.padding = '32px';
@@ -214,8 +213,12 @@ export function FinancialReportModal({ isOpen, onClose, client, loan }: Financia
           </div>
 
           {/* Conteúdo do relatório (é isto que vira o PDF) */}
-          <div className="overflow-y-auto">
-            <div id="financial-report-content" className="p-8 bg-white">
+          <div className="overflow-auto">
+            <div
+              id="financial-report-content"
+              className="p-8 bg-white"
+              style={{ width: '794px', minWidth: '794px' }}
+            >
               {/* Cabeçalho com a marca */}
               <div className="flex items-center justify-between border-b-2 border-[#0F5F4A] pb-3 mb-5">
                 <div className="flex items-center gap-3">
@@ -256,11 +259,11 @@ export function FinancialReportModal({ isOpen, onClose, client, loan }: Financia
                   </div>
                   <div>
                     <span className="text-black/55 block text-[10px] uppercase tracking-wider">Email</span>
-                    <span className="font-bold text-black">{client.email}</span>
+                    <span className="font-bold text-black break-all">{client.email}</span>
                   </div>
                   <div>
                     <span className="text-black/55 block text-[10px] uppercase tracking-wider">Endereço</span>
-                    <span className="font-bold text-black">{client.address || 'Não informado'}</span>
+                    <span className="font-bold text-black break-words">{client.address || 'Não informado'}</span>
                   </div>
                   <div>
                     <span className="text-black/55 block text-[10px] uppercase tracking-wider">Classificação</span>
@@ -274,16 +277,16 @@ export function FinancialReportModal({ isOpen, onClose, client, loan }: Financia
                 <h2 className="text-sm font-bold text-black uppercase tracking-wider border-b border-slate-300 pb-1 mb-2">
                   Informações do Contrato
                 </h2>
-                <div className="grid grid-cols-4 gap-3 text-[12px] bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <div>
+                <div className="grid grid-cols-4 gap-4 text-[12px] bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <div className="min-w-0">
                     <span className="text-black/55 block text-[10px] uppercase tracking-wider">Valor Emprestado</span>
-                    <span className="text-base font-black text-black">{formatCurrency(loan.principal)}</span>
+                    <span className="block text-base font-black text-black whitespace-nowrap">{formatCurrency(loan.principal)}</span>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-black/55 block text-[10px] uppercase tracking-wider">Data do Contrato</span>
-                    <span className="font-bold text-black">{formatDate(loan.startDate)}</span>
+                    <span className="block font-bold text-black whitespace-nowrap">{formatDate(loan.startDate)}</span>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-black/55 block text-[10px] uppercase tracking-wider">Modalidade</span>
                     <span className="font-bold text-black">
                       {isInstallment
@@ -291,7 +294,7 @@ export function FinancialReportModal({ isOpen, onClose, client, loan }: Financia
                         : 'Juros Mensal'}
                     </span>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-black/55 block text-[10px] uppercase tracking-wider">Situação Atual</span>
                     <span className="font-bold text-black uppercase">
                       {loan.status === 'active' ? 'Em aberto' : loan.status === 'paid' ? 'Quitado' : 'Atrasado'}
