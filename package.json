@@ -1,421 +1,51 @@
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, Download } from 'lucide-react';
-import { Client, Loan, Payment } from '../types';
-import { supabase } from '../lib/supabase';
-import { mapSupabasePayment } from '../lib/supabase-mapper';
-import { formatCurrency, formatCpf } from '../lib/utils';
-import { format, addMonths } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { toPng } from 'html-to-image';
-import jsPDF from 'jspdf';
-
-interface FinancialReportModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  client: Client;
-  loan: Loan;
-}
-
-const toDateObj = (date: any): Date | null => {
-  if (!date) return null;
-  if (typeof date?.toDate === 'function') return date.toDate();
-  const d = new Date(date);
-  return isNaN(d.getTime()) ? null : d;
-};
-
-export function FinancialReportModal({ isOpen, onClose, client, loan }: FinancialReportModalProps) {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const fetchPayments = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('payments')
-          .select('*')
-          .eq('loan_id', loan.id)
-          .order('date', { ascending: false });
-
-        if (error) throw error;
-
-        if (data) {
-          setPayments(data.map(mapSupabasePayment));
-        }
-      } catch (error) {
-        console.error('Error fetching payments:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPayments();
-  }, [isOpen, loan.id]);
-
-  if (!isOpen) return null;
-
-  const handlePrint = async () => {
-    const element = document.getElementById('financial-report-content');
-    if (!element) return;
-
-    setIsGenerating(true);
-    try {
-      // Renderiza em largura fixa (proporção A4) para captura estável
-      const originalStyle = element.style.cssText;
-      element.style.width = '794px'; // ~A4 @96dpi
-      element.style.maxHeight = 'none';
-      element.style.overflow = 'visible';
-      element.style.padding = '32px';
-      element.style.backgroundColor = '#ffffff';
-
-      const dataUrl = await toPng(element, {
-        quality: 1.0,
-        pixelRatio: 2,
-        backgroundColor: '#ffffff',
-      });
-
-      element.style.cssText = originalStyle;
-
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-      const pageWidth = pdf.internal.pageSize.getWidth();   // 210
-      const pageHeight = pdf.internal.pageSize.getHeight(); // 297
-      const margin = 6;
-      const maxW = pageWidth - margin * 2;
-      const maxH = pageHeight - margin * 2;
-
-      const imgProps = pdf.getImageProperties(dataUrl);
-
-      // Escala para CABER INTEIRO em uma única página (sem cortar, sem página extra)
-      const ratio = Math.min(maxW / imgProps.width, maxH / imgProps.height);
-      const imgW = imgProps.width * ratio;
-      const imgH = imgProps.height * ratio;
-      const offsetX = (pageWidth - imgW) / 2;
-      const offsetY = margin;
-
-      pdf.addImage(dataUrl, 'PNG', offsetX, offsetY, imgW, imgH, undefined, 'FAST');
-
-      // Garante que o arquivo tenha exatamente 1 página
-      while (pdf.getNumberOfPages() > 1) {
-        pdf.deletePage(pdf.getNumberOfPages());
-      }
-
-      pdf.save(`Relatorio_${client.name.replace(/\s+/g, '_')}_${format(new Date(), 'ddMMyyyy')}.pdf`);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  // Classificação do cliente
-  const isOverdue = loan.status === 'overdue';
-  const hasPaid = payments.length > 0;
-  let clientRating = 'Novo (Sem histórico)';
-  if (isOverdue) {
-    clientRating = 'Risco Alto (Atrasado)';
-  } else if (loan.status === 'paid') {
-    clientRating = 'Ouro (Excelente)';
-  } else if (hasPaid) {
-    clientRating = 'Prata (Bom)';
+{
+  "name": "fast-credit",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port=3000 --host=0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.3.0",
+    "@fontsource-variable/geist": "^5.2.8",
+    "@google/genai": "^1.29.0",
+    "@supabase/supabase-js": "^2.101.1",
+    "@tailwindcss/vite": "^4.1.14",
+    "@vitejs/plugin-react": "^5.0.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "firebase": "^12.11.0",
+    "html-to-image": "^1.11.13",
+    "html2pdf.js": "^0.14.0",
+    "jspdf": "^4.2.1",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.13.2",
+    "recharts": "^3.8.1",
+    "shadcn": "^4.1.1",
+    "tailwind-merge": "^3.5.0",
+    "tw-animate-css": "^1.4.0",
+    "vite": "^6.2.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.4.21",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
   }
-
-  const totalPaid = payments.reduce((acc, curr) => acc + curr.amount, 0);
-
-  const formatDate = (date: any) => {
-    const d = toDateObj(date);
-    return d ? format(d, 'dd/MM/yyyy', { locale: ptBR }) : 'N/A';
-  };
-
-  // ----- Plano de parcelas (somente para empréstimo parcelado) -----
-  const isInstallment = loan.type === 'installment';
-  const installmentsCount = isInstallment ? loan.installments || 1 : 0;
-  const installmentValue =
-    loan.installmentValue ||
-    (installmentsCount ? (loan.totalAmount || loan.principal) / installmentsCount : 0);
-
-  const baseDate = toDateObj(loan.nextDueDate) || toDateObj(loan.startDate) || new Date();
-
-  const schedule = isInstallment
-    ? Array.from({ length: installmentsCount }, (_, i) => {
-        const due = addMonths(baseDate, i);
-        const coveredUpTo = installmentValue * (i + 1);
-        const paid = totalPaid >= coveredUpTo - 0.01;
-        const partial = !paid && totalPaid > installmentValue * i + 0.01;
-        return {
-          n: i + 1,
-          due,
-          value: installmentValue,
-          status: paid ? 'Pago' : partial ? 'Parcial' : due < new Date() ? 'Vencida' : 'A vencer',
-        };
-      })
-    : [];
-
-  const totalParcelado = installmentValue * installmentsCount;
-
-  // Mantém o documento em uma página: no máximo 10 pagamentos recentes
-  const MAX_ROWS = 10;
-  const visiblePayments = payments.slice(0, MAX_ROWS);
-  const hiddenPayments = payments.length - visiblePayments.length;
-
-  const scheduleColumns =
-    schedule.length > 8 ? [schedule.slice(0, Math.ceil(schedule.length / 2)), schedule.slice(Math.ceil(schedule.length / 2))] : [schedule];
-
-  return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-        />
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-3xl bg-white text-slate-900 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-        >
-          {/* Ações (fora do PDF) */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
-            <h2 className="text-lg font-bold text-slate-800">Relatório Financeiro</h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePrint}
-                disabled={isGenerating || loading}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                {isGenerating ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Gerando PDF...
-                  </>
-                ) : (
-                  <>
-                    <Download size={16} />
-                    Salvar PDF
-                  </>
-                )}
-              </button>
-              <button
-                onClick={onClose}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-          </div>
-
-          {/* Conteúdo do relatório (é isto que vira o PDF) */}
-          <div className="overflow-y-auto">
-            <div id="financial-report-content" className="p-8 bg-white">
-              {/* Cabeçalho */}
-              <div className="text-center mb-5 border-b-2 border-slate-800 pb-3">
-                <h1 className="text-xl font-black text-slate-900 uppercase tracking-widest">
-                  Histórico Financeiro do Cliente
-                </h1>
-                <p className="text-[11px] text-slate-500 font-medium mt-1">
-                  Documento Oficial • Emitido em {format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                </p>
-              </div>
-
-              {/* Dados do cliente */}
-              <div className="mb-5">
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-300 pb-1 mb-2">
-                  Dados do Cliente
-                </h2>
-                <div className="grid grid-cols-2 gap-y-2 gap-x-6 text-[12px]">
-                  <div>
-                    <span className="text-slate-500 block text-[10px] uppercase tracking-wider">Nome Completo</span>
-                    <span className="font-bold text-slate-900">{client.name}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px] uppercase tracking-wider">CPF</span>
-                    <span className="font-bold text-slate-900">{formatCpf(client.cpf)}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px] uppercase tracking-wider">Email</span>
-                    <span className="font-bold text-slate-900">{client.email}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px] uppercase tracking-wider">Endereço</span>
-                    <span className="font-bold text-slate-900">{client.address || 'Não informado'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px] uppercase tracking-wider">Classificação</span>
-                    <span className="font-bold text-slate-900">{clientRating}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contrato */}
-              <div className="mb-5">
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-300 pb-1 mb-2">
-                  Informações do Contrato
-                </h2>
-                <div className="grid grid-cols-4 gap-3 text-[12px] bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <div>
-                    <span className="text-slate-500 block text-[10px] uppercase tracking-wider">Valor Emprestado</span>
-                    <span className="text-base font-black text-slate-900">{formatCurrency(loan.principal)}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px] uppercase tracking-wider">Data do Contrato</span>
-                    <span className="font-bold text-slate-900">{formatDate(loan.startDate)}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px] uppercase tracking-wider">Modalidade</span>
-                    <span className="font-bold text-slate-900">
-                      {isInstallment
-                        ? `Parcelado em ${installmentsCount}x`
-                        : 'Juros Mensal'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px] uppercase tracking-wider">Situação Atual</span>
-                    <span className="font-bold text-slate-900 uppercase">
-                      {loan.status === 'active' ? 'Em aberto' : loan.status === 'paid' ? 'Quitado' : 'Atrasado'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Plano de parcelas */}
-              {isInstallment && schedule.length > 0 && (
-                <div className="mb-5">
-                  <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-300 pb-1 mb-2">
-                    Plano de Parcelamento
-                  </h2>
-
-                  <div className="grid grid-cols-3 gap-3 text-[12px] mb-3">
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                      <span className="text-slate-500 block text-[10px] uppercase tracking-wider">Qtd. de Parcelas</span>
-                      <span className="font-black text-slate-900 text-base">{installmentsCount}x</span>
-                    </div>
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                      <span className="text-slate-500 block text-[10px] uppercase tracking-wider">Valor da Parcela</span>
-                      <span className="font-black text-slate-900 text-base">{formatCurrency(installmentValue)}</span>
-                    </div>
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
-                      <span className="text-slate-500 block text-[10px] uppercase tracking-wider">Total do Parcelamento</span>
-                      <span className="font-black text-slate-900 text-base">{formatCurrency(totalParcelado)}</span>
-                    </div>
-                  </div>
-
-                  <div className={`grid ${scheduleColumns.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
-                    {scheduleColumns.map((col, ci) => (
-                      <table key={ci} className="w-full text-[11px] text-left">
-                        <thead className="bg-slate-100 text-slate-600 uppercase text-[9px] font-bold tracking-wider">
-                          <tr>
-                            <th className="px-2 py-1.5">Parc.</th>
-                            <th className="px-2 py-1.5">Vencimento</th>
-                            <th className="px-2 py-1.5 text-right">Valor</th>
-                            <th className="px-2 py-1.5 text-right">Situação</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200">
-                          {col.map((p) => (
-                            <tr key={p.n}>
-                              <td className="px-2 py-1 font-bold text-slate-900">
-                                {p.n}/{installmentsCount}
-                              </td>
-                              <td className="px-2 py-1 text-slate-700">
-                                {format(p.due, 'dd/MM/yyyy', { locale: ptBR })}
-                              </td>
-                              <td className="px-2 py-1 text-right font-bold text-slate-900">
-                                {formatCurrency(p.value)}
-                              </td>
-                              <td
-                                className={`px-2 py-1 text-right font-bold ${
-                                  p.status === 'Pago'
-                                    ? 'text-emerald-600'
-                                    : p.status === 'Vencida'
-                                    ? 'text-red-600'
-                                    : 'text-slate-500'
-                                }`}
-                              >
-                                {p.status}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Histórico de pagamentos */}
-              <div className="mb-5">
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-300 pb-1 mb-2">
-                  Histórico de Pagamentos
-                </h2>
-                {loading ? (
-                  <div className="text-center py-4 text-slate-500 text-[12px]">Carregando pagamentos...</div>
-                ) : payments.length === 0 ? (
-                  <div className="text-center py-3 text-slate-500 text-[12px] bg-slate-50 rounded-lg border border-slate-200">
-                    Nenhum pagamento registrado para este contrato.
-                  </div>
-                ) : (
-                  <>
-                    <table className="w-full text-[11px] text-left">
-                      <thead className="bg-slate-100 text-slate-600 uppercase text-[9px] font-bold tracking-wider">
-                        <tr>
-                          <th className="px-2 py-1.5">Data</th>
-                          <th className="px-2 py-1.5">Descrição</th>
-                          <th className="px-2 py-1.5 text-right">Valor Pago</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200">
-                        {visiblePayments.map((payment) => (
-                          <tr key={payment.id}>
-                            <td className="px-2 py-1 font-medium text-slate-900">{formatDate(payment.date)}</td>
-                            <td className="px-2 py-1 text-slate-600">Pagamento de parcela/juros</td>
-                            <td className="px-2 py-1 text-right font-bold text-emerald-600">
-                              {formatCurrency(payment.amount)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {hiddenPayments > 0 && (
-                      <p className="text-[10px] text-slate-500 mt-1 italic">
-                        + {hiddenPayments} pagamento(s) anterior(es) não exibido(s) neste resumo.
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* Resumo */}
-              <div className="mb-4 grid grid-cols-2 gap-3 text-[12px]">
-                <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
-                  <span className="text-emerald-700 block text-[10px] uppercase tracking-wider">Total Pago até o Momento</span>
-                  <span className="text-lg font-black text-emerald-700">{formatCurrency(totalPaid)}</span>
-                </div>
-                <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg">
-                  <span className="text-slate-500 block text-[10px] uppercase tracking-wider">Saldo Devedor</span>
-                  <span className="text-lg font-black text-slate-900">
-                    {formatCurrency(Math.max(0, loan.remainingAmount || 0))}
-                  </span>
-                </div>
-              </div>
-
-              {/* Observações */}
-              <div className="pt-3 border-t border-slate-300 text-center">
-                <p className="text-[11px] text-slate-500 italic">
-                  "Este documento representa o histórico financeiro atualizado do cliente junto ao sistema."
-                </p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>
-  );
 }
