@@ -1,216 +1,436 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Logo } from './Logo';
-import { LayoutDashboard, Users, UserPlus, Settings, LogOut, Menu, X, TrendingUp, ShieldAlert, DollarSign, Gem } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { cn } from '../lib/utils';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { X, Download } from 'lucide-react';
+import { Client, Loan, Payment } from '../types';
+import { supabase } from '../lib/supabase';
+import { mapSupabasePayment } from '../lib/supabase-mapper';
+import { formatCurrency, formatCpf } from '../lib/utils';
+import { format, addMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { toPng } from 'html-to-image';
+import jsPDF from 'jspdf';
+import { LogoMark } from './Logo';
 
-const DEFAULT_ADMIN_EMAIL = 'michaeldsandes@gmail.com';
+interface FinancialReportModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  client: Client;
+  loan: Loan;
+}
 
-const navItems = [
-  { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/clients', icon: Users, label: 'Clientes' },
-  { path: '/loans', icon: DollarSign, label: 'Empréstimos' },
-  { path: '/register', icon: UserPlus, label: 'Cadastrar' },
-  { path: '/credit-intelligence', icon: Gem, label: 'Credit Intelligence' },
-  { path: '/settings', icon: Settings, label: 'Configurações' },
-];
+const toDateObj = (date: any): Date | null => {
+  if (!date) return null;
+  if (typeof date?.toDate === 'function') return date.toDate();
+  const d = new Date(date);
+  return isNaN(d.getTime()) ? null : d;
+};
 
-export default function Layout() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const location = useLocation();
-  const navigate = useNavigate();
+export function FinancialReportModal({ isOpen, onClose, client, loan }: FinancialReportModalProps) {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      const mockUser = localStorage.getItem('mockUser');
-      if (mockUser) {
-        setIsAdmin(true);
-        return;
-      }
+    if (!isOpen) return;
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      setUserEmail(user.email || null);
-      const normalizedEmail = user.email?.trim().toLowerCase() || null;
-
-      // Check if user is the default admin email
-      if (normalizedEmail === DEFAULT_ADMIN_EMAIL) {
-        setIsAdmin(true);
-        return;
-      }
-
-      // Check if user has admin role in Supabase
+    const fetchPayments = async () => {
+      setLoading(true);
       try {
-        const { data, error } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
+        const { data, error } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('loan_id', loan.id)
+          .order('date', { ascending: false });
+
         if (error) throw error;
 
-        if (data && data.role === 'admin') {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
+        if (data) {
+          setPayments(data.map(mapSupabasePayment));
         }
       } catch (error) {
-        console.error("Error checking admin status:", error);
-        setIsAdmin(false);
+        console.error('Error fetching payments:', error);
+      } finally {
+        setLoading(false);
       }
     };
-    checkAdmin();
-  }, []);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.href = '/login'; // Force reload to clear state
+    fetchPayments();
+  }, [isOpen, loan.id]);
+
+  if (!isOpen) return null;
+
+  const handlePrint = async () => {
+    const element = document.getElementById('financial-report-content');
+    if (!element) return;
+
+    setIsGenerating(true);
+    try {
+      // Renderiza em largura fixa (proporção A4) para captura estável
+      const originalStyle = element.style.cssText;
+      element.style.width = '794px'; // ~A4 @96dpi
+      element.style.maxHeight = 'none';
+      element.style.overflow = 'visible';
+      element.style.padding = '32px';
+      element.style.backgroundColor = '#ffffff';
+
+      const dataUrl = await toPng(element, {
+        quality: 1.0,
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+      });
+
+      element.style.cssText = originalStyle;
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();   // 210
+      const pageHeight = pdf.internal.pageSize.getHeight(); // 297
+      const margin = 6;
+      const maxW = pageWidth - margin * 2;
+      const maxH = pageHeight - margin * 2;
+
+      const imgProps = pdf.getImageProperties(dataUrl);
+
+      // Escala para CABER INTEIRO em uma única página (sem cortar, sem página extra)
+      const ratio = Math.min(maxW / imgProps.width, maxH / imgProps.height);
+      const imgW = imgProps.width * ratio;
+      const imgH = imgProps.height * ratio;
+      const offsetX = (pageWidth - imgW) / 2;
+      const offsetY = margin;
+
+      pdf.addImage(dataUrl, 'PNG', offsetX, offsetY, imgW, imgH, undefined, 'FAST');
+
+      // Garante que o arquivo tenha exatamente 1 página
+      while (pdf.getNumberOfPages() > 1) {
+        pdf.deletePage(pdf.getNumberOfPages());
+      }
+
+      pdf.save(`Relatorio_${client.name.replace(/\s+/g, '_')}_${format(new Date(), 'ddMMyyyy')}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  if (isAdmin === false) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-slate-100">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center space-y-6">
-          <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto text-amber-500">
-            <ShieldAlert size={32} />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-bold text-white">Acesso Restrito</h2>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Sua conta ({userEmail}) não tem permissão para acessar o painel administrativo.
-            </p>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all"
-          >
-            Sair e Trocar de Conta
-          </button>
-        </div>
-      </div>
-    );
+  // Classificação do cliente
+  const isOverdue = loan.status === 'overdue';
+  const hasPaid = payments.length > 0;
+  let clientRating = 'Novo (Sem histórico)';
+  if (isOverdue) {
+    clientRating = 'Risco Alto (Atrasado)';
+  } else if (loan.status === 'paid') {
+    clientRating = 'Ouro (Excelente)';
+  } else if (hasPaid) {
+    clientRating = 'Prata (Bom)';
   }
 
+  const totalPaid = payments.reduce((acc, curr) => acc + curr.amount, 0);
+
+  const formatDate = (date: any) => {
+    const d = toDateObj(date);
+    return d ? format(d, 'dd/MM/yyyy', { locale: ptBR }) : 'N/A';
+  };
+
+  // ----- Plano de parcelas (somente para empréstimo parcelado) -----
+  const isInstallment = loan.type === 'installment';
+  const installmentsCount = isInstallment ? loan.installments || 1 : 0;
+  const installmentValue =
+    loan.installmentValue ||
+    (installmentsCount ? (loan.totalAmount || loan.principal) / installmentsCount : 0);
+
+  const baseDate = toDateObj(loan.nextDueDate) || toDateObj(loan.startDate) || new Date();
+
+  const schedule = isInstallment
+    ? Array.from({ length: installmentsCount }, (_, i) => {
+        const due = addMonths(baseDate, i);
+        const coveredUpTo = installmentValue * (i + 1);
+        const paid = totalPaid >= coveredUpTo - 0.01;
+        const partial = !paid && totalPaid > installmentValue * i + 0.01;
+        return {
+          n: i + 1,
+          due,
+          value: installmentValue,
+          status: paid ? 'Pago' : partial ? 'Parcial' : due < new Date() ? 'Vencida' : 'A vencer',
+        };
+      })
+    : [];
+
+  const totalParcelado = installmentValue * installmentsCount;
+
+  // Mantém o documento em uma página: no máximo 10 pagamentos recentes
+  const MAX_ROWS = 10;
+  const visiblePayments = payments.slice(0, MAX_ROWS);
+  const hiddenPayments = payments.length - visiblePayments.length;
+
+  const scheduleColumns =
+    schedule.length > 8 ? [schedule.slice(0, Math.ceil(schedule.length / 2)), schedule.slice(Math.ceil(schedule.length / 2))] : [schedule];
+
   return (
-    <div className="h-screen bg-slate-950 text-slate-100 flex overflow-hidden">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 flex-shrink-0">
-        <div className="p-6 flex justify-center">
-          <Logo size={104} animated />
-        </div>
-        <nav className="flex-1 px-4 space-y-2">
-          {navItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
-                location.pathname === item.path
-                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/20"
-                  : "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
-              )}
-            >
-              <item.icon size={20} />
-              <span className="font-medium">{item.label}</span>
-            </Link>
-          ))}
-        </nav>
-        <div className="p-4 border-t border-slate-800">
-          <div className="px-4 py-3 mb-2">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Usuário</p>
-            <p className="text-sm font-bold text-emerald-400 truncate">
-              {userEmail || 'Administrador'}
-            </p>
+    <AnimatePresence>
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        />
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          className="relative w-full max-w-3xl bg-white text-black rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        >
+          {/* Ações (fora do PDF) */}
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
+            <h2 className="text-lg font-bold text-black">Relatório Financeiro</h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePrint}
+                disabled={isGenerating || loading}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                {isGenerating ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Gerando PDF...
+                  </>
+                ) : (
+                  <>
+                    <Download size={16} />
+                    Salvar PDF
+                  </>
+                )}
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 text-slate-400 hover:text-black/70 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-3 w-full text-slate-400 hover:text-red-400 transition-colors"
-          >
-            <LogOut size={20} />
-            <span className="font-medium">Sair</span>
-          </button>
-        </div>
-      </aside>
 
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 z-50">
-        <Logo size={44} tagline={false} />
-        <button onClick={() => setIsSidebarOpen(true)} className="text-slate-100">
-          <Menu size={24} />
-        </button>
-      </div>
-
-      {/* Mobile Sidebar Overlay */}
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 bg-black/50 z-[60] md:hidden"
-            />
-            <motion.aside
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              className="fixed top-0 left-0 bottom-0 w-64 bg-slate-900 z-[70] md:hidden flex flex-col"
-            >
-              <div className="p-6 flex items-center justify-between">
-                <Logo size={88} />
-                <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400">
-                  <X size={24} />
-                </button>
+          {/* Conteúdo do relatório (é isto que vira o PDF) */}
+          <div className="overflow-y-auto">
+            <div id="financial-report-content" className="p-8 bg-white">
+              {/* Cabeçalho com a marca */}
+              <div className="flex items-center justify-between border-b-2 border-[#0F5F4A] pb-3 mb-5">
+                <div className="flex items-center gap-3">
+                  <LogoMark size={54} glow={false} tagline={false} />
+                  <div className="leading-none">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xl font-black tracking-tight text-[#0F5F4A]">FAST</span>
+                      <span className="text-xl font-black tracking-tight text-[#10B981]">CREDIT</span>
+                    </div>
+                    <span className="text-[8px] font-bold uppercase tracking-[0.3em] text-[#0F5F4A]">
+                      Gestão de Crédito
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <h1 className="text-sm font-black text-black uppercase tracking-widest">
+                    Histórico Financeiro
+                  </h1>
+                  <p className="text-[10px] text-black/60 font-medium mt-0.5">
+                    Emitido em {format(new Date(), "dd/MM/yyyy", { locale: ptBR })}
+                  </p>
+                </div>
               </div>
-              <nav className="flex-1 px-4 space-y-2">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    onClick={() => setIsSidebarOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
-                      location.pathname === item.path
-                        ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/20"
-                        : "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+
+              {/* Dados do cliente */}
+              <div className="mb-5">
+                <h2 className="text-sm font-bold text-black uppercase tracking-wider border-b border-slate-300 pb-1 mb-2">
+                  Dados do Cliente
+                </h2>
+                <div className="grid grid-cols-2 gap-y-2 gap-x-6 text-[12px]">
+                  <div>
+                    <span className="text-black/55 block text-[10px] uppercase tracking-wider">Nome Completo</span>
+                    <span className="font-bold text-black">{client.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-black/55 block text-[10px] uppercase tracking-wider">CPF</span>
+                    <span className="font-bold text-black">{formatCpf(client.cpf)}</span>
+                  </div>
+                  <div>
+                    <span className="text-black/55 block text-[10px] uppercase tracking-wider">Email</span>
+                    <span className="font-bold text-black">{client.email}</span>
+                  </div>
+                  <div>
+                    <span className="text-black/55 block text-[10px] uppercase tracking-wider">Endereço</span>
+                    <span className="font-bold text-black">{client.address || 'Não informado'}</span>
+                  </div>
+                  <div>
+                    <span className="text-black/55 block text-[10px] uppercase tracking-wider">Classificação</span>
+                    <span className="font-bold text-black">{clientRating}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contrato */}
+              <div className="mb-5">
+                <h2 className="text-sm font-bold text-black uppercase tracking-wider border-b border-slate-300 pb-1 mb-2">
+                  Informações do Contrato
+                </h2>
+                <div className="grid grid-cols-4 gap-3 text-[12px] bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <div>
+                    <span className="text-black/55 block text-[10px] uppercase tracking-wider">Valor Emprestado</span>
+                    <span className="text-base font-black text-black">{formatCurrency(loan.principal)}</span>
+                  </div>
+                  <div>
+                    <span className="text-black/55 block text-[10px] uppercase tracking-wider">Data do Contrato</span>
+                    <span className="font-bold text-black">{formatDate(loan.startDate)}</span>
+                  </div>
+                  <div>
+                    <span className="text-black/55 block text-[10px] uppercase tracking-wider">Modalidade</span>
+                    <span className="font-bold text-black">
+                      {isInstallment
+                        ? `Parcelado em ${installmentsCount}x`
+                        : 'Juros Mensal'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-black/55 block text-[10px] uppercase tracking-wider">Situação Atual</span>
+                    <span className="font-bold text-black uppercase">
+                      {loan.status === 'active' ? 'Em aberto' : loan.status === 'paid' ? 'Quitado' : 'Atrasado'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Plano de parcelas */}
+              {isInstallment && schedule.length > 0 && (
+                <div className="mb-5">
+                  <h2 className="text-sm font-bold text-black uppercase tracking-wider border-b border-slate-300 pb-1 mb-2">
+                    Plano de Parcelamento
+                  </h2>
+
+                  <div className="grid grid-cols-3 gap-3 text-[12px] mb-3">
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                      <span className="text-black/55 block text-[10px] uppercase tracking-wider">Qtd. de Parcelas</span>
+                      <span className="font-black text-black text-base">{installmentsCount}x</span>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                      <span className="text-black/55 block text-[10px] uppercase tracking-wider">Valor da Parcela</span>
+                      <span className="font-black text-black text-base">{formatCurrency(installmentValue)}</span>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                      <span className="text-black/55 block text-[10px] uppercase tracking-wider">Total do Parcelamento</span>
+                      <span className="font-black text-black text-base">{formatCurrency(totalParcelado)}</span>
+                    </div>
+                  </div>
+
+                  <div className={`grid ${scheduleColumns.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+                    {scheduleColumns.map((col, ci) => (
+                      <table key={ci} className="w-full text-[11px] text-left">
+                        <thead className="bg-slate-100 text-black/70 uppercase text-[9px] font-bold tracking-wider">
+                          <tr>
+                            <th className="px-2 py-1.5">Parc.</th>
+                            <th className="px-2 py-1.5">Vencimento</th>
+                            <th className="px-2 py-1.5 text-right">Valor</th>
+                            <th className="px-2 py-1.5 text-right">Situação</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                          {col.map((p) => (
+                            <tr key={p.n}>
+                              <td className="px-2 py-1 font-bold text-black">
+                                {p.n}/{installmentsCount}
+                              </td>
+                              <td className="px-2 py-1 text-black">
+                                {format(p.due, 'dd/MM/yyyy', { locale: ptBR })}
+                              </td>
+                              <td className="px-2 py-1 text-right font-bold text-black">
+                                {formatCurrency(p.value)}
+                              </td>
+                              <td
+                                className={`px-2 py-1 text-right font-bold ${
+                                  p.status === 'Pago'
+                                    ? 'text-emerald-600'
+                                    : p.status === 'Vencida'
+                                    ? 'text-red-600'
+                                    : 'text-black/55'
+                                }`}
+                              >
+                                {p.status}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Histórico de pagamentos */}
+              <div className="mb-5">
+                <h2 className="text-sm font-bold text-black uppercase tracking-wider border-b border-slate-300 pb-1 mb-2">
+                  Histórico de Pagamentos
+                </h2>
+                {loading ? (
+                  <div className="text-center py-4 text-black/55 text-[12px]">Carregando pagamentos...</div>
+                ) : payments.length === 0 ? (
+                  <div className="text-center py-3 text-black/55 text-[12px] bg-slate-50 rounded-lg border border-slate-200">
+                    Nenhum pagamento registrado para este contrato.
+                  </div>
+                ) : (
+                  <>
+                    <table className="w-full text-[11px] text-left">
+                      <thead className="bg-slate-100 text-black/70 uppercase text-[9px] font-bold tracking-wider">
+                        <tr>
+                          <th className="px-2 py-1.5">Data</th>
+                          <th className="px-2 py-1.5">Descrição</th>
+                          <th className="px-2 py-1.5 text-right">Valor Pago</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {visiblePayments.map((payment) => (
+                          <tr key={payment.id}>
+                            <td className="px-2 py-1 font-medium text-black">{formatDate(payment.date)}</td>
+                            <td className="px-2 py-1 text-black/70">Pagamento de parcela/juros</td>
+                            <td className="px-2 py-1 text-right font-bold text-emerald-600">
+                              {formatCurrency(payment.amount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {hiddenPayments > 0 && (
+                      <p className="text-[10px] text-black/55 mt-1 italic">
+                        + {hiddenPayments} pagamento(s) anterior(es) não exibido(s) neste resumo.
+                      </p>
                     )}
-                  >
-                    <item.icon size={20} />
-                    <span className="font-medium">{item.label}</span>
-                  </Link>
-                ))}
-              </nav>
-              <div className="p-4 border-t border-slate-800">
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-3 px-4 py-3 w-full text-slate-400 hover:text-red-400 transition-colors"
-                >
-                  <LogOut size={20} />
-                  <span className="font-medium">Sair</span>
-                </button>
+                  </>
+                )}
               </div>
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
 
-      {/* Main Content */}
-      <main className="flex-1 p-4 sm:p-6 md:p-10 pt-20 md:pt-10 overflow-y-auto w-full overflow-x-hidden">
-        <div className="max-w-7xl mx-auto w-full">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </main>
-    </div>
+              {/* Resumo */}
+              <div className="mb-4 grid grid-cols-2 gap-3 text-[12px]">
+                <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
+                  <span className="text-emerald-700 block text-[10px] uppercase tracking-wider">Total Pago até o Momento</span>
+                  <span className="text-lg font-black text-emerald-700">{formatCurrency(totalPaid)}</span>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg">
+                  <span className="text-black/55 block text-[10px] uppercase tracking-wider">Saldo Devedor</span>
+                  <span className="text-lg font-black text-black">
+                    {formatCurrency(Math.max(0, loan.remainingAmount || 0))}
+                  </span>
+                </div>
+              </div>
+
+              {/* Observações */}
+              <div className="pt-3 border-t border-slate-300 text-center">
+                <p className="text-[11px] text-black/55 italic">
+                  "Este documento representa o histórico financeiro atualizado do cliente junto ao sistema."
+                </p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
   );
 }
