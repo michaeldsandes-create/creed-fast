@@ -134,7 +134,13 @@ export default function Layout() {
 
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 z-50">
-        <Logo size={44} tagline={false} />
+        <div className="flex items-center gap-2.5">
+          <Logo size={44} tagline={false} />
+          <div className="flex items-baseline gap-1.5 leading-none">
+            <span className="text-lg font-black tracking-tight text-white">FAST</span>
+            <span className="text-lg font-black tracking-tight text-emerald-400">CREDIT</span>
+          </div>
+        </div>
         <button onClick={() => setIsSidebarOpen(true)} className="text-slate-100">
           <Menu size={24} />
         </button>
@@ -158,7 +164,13 @@ export default function Layout() {
               className="fixed top-0 left-0 bottom-0 w-64 bg-slate-900 z-[70] md:hidden flex flex-col"
             >
               <div className="p-6 flex items-center justify-between">
-                <Logo size={88} />
+                <div className="flex items-center gap-2.5">
+                  <Logo size={52} tagline={false} />
+                  <div className="flex flex-col leading-none">
+                    <span className="text-base font-black tracking-tight text-white">FAST</span>
+                    <span className="text-base font-black tracking-tight text-emerald-400">CREDIT</span>
+                  </div>
+                </div>
                 <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400">
                   <X size={24} />
                 </button>
