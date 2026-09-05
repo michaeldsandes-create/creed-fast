@@ -110,9 +110,10 @@ export default function Clients() {
 
   const filteredClients = useMemo(() => {
     return clients.filter(c => {
-      const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || 
-                           c.cpf.includes(search) || 
-                           c.email.toLowerCase().includes(search.toLowerCase());
+      const term = search.toLowerCase();
+      const matchesSearch = (c.name || '').toLowerCase().includes(term) ||
+                           (c.cpf || '').includes(search) ||
+                           (c.email || '').toLowerCase().includes(term);
       const matchesFilter = filterStatus ? c.status === filterStatus : true;
       return matchesSearch && matchesFilter;
     });
@@ -316,7 +317,7 @@ export default function Clients() {
             <tbody className="divide-y divide-slate-800">
               <AnimatePresence mode="popLayout">
                 {filteredClients.map((client) => {
-                  const StatusIcon = statusIcons[client.status];
+                  const StatusIcon = statusIcons[client.status] || AlertCircle;
                   return (
                     <motion.tr
                       key={client.id}
@@ -332,7 +333,7 @@ export default function Clients() {
                             {client.selfieUrl ? (
                               <img src={client.selfieUrl} alt={client.name} className="w-full h-full object-cover" />
                             ) : (
-                              client.name.charAt(0)
+                              (client.name || '?').charAt(0)
                             )}
                           </div>
                           <div>
@@ -347,10 +348,10 @@ export default function Clients() {
                       <td className="px-6 py-5">
                         <span className={cn(
                           "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border",
-                          statusColors[client.status]
+                          statusColors[client.status] || 'bg-slate-500/10 text-slate-400 border-slate-500/20'
                         )}>
                           <StatusIcon size={14} />
-                          {client.status}
+                          {client.status || 'Sem status'}
                         </span>
                       </td>
                       <td className="px-6 py-5 text-sm font-bold text-white">
